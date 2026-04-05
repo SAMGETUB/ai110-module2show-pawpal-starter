@@ -10,6 +10,8 @@ class Task:
     priority: int
     time: datetime
     status: str = "pending"
+    pet_name: Optional[str] = None
+    recurrence: Optional[str] = None
 
     def mark_complete(self) -> None:
         """Mark the task as completed."""
@@ -25,6 +27,7 @@ class Pet:
 
     def add_task(self, task: Task) -> None:
         """Add a task to this pet."""
+        task.pet_name = self.name
         self.task_list.append(task)
 
     def get_tasks(self) -> List[Task]:
@@ -60,8 +63,8 @@ class Scheduler:
         return self.sort_by_time(tasks)
 
     def sort_by_time(self, tasks: List[Task]) -> List[Task]:
-        """Sort tasks by their scheduled time."""
-        return sorted(tasks, key=lambda task: task.time)
+        """Sort tasks by their scheduled time, then by priority (lower priority number first)."""
+        return sorted(tasks, key=lambda task: (task.time, task.priority))
 
     def filter_tasks(
         self,
@@ -75,6 +78,14 @@ class Scheduler:
             return [task for task in tasks if criteria(task)]
         return [task for task in tasks if all(getattr(task, key, None) == value for key, value in criteria.items())]
 
+    def filter_by_status(self, tasks: List[Task], status: str) -> List[Task]:
+        """Filter tasks by status."""
+        return [task for task in tasks if task.status == status]
+
+    def filter_by_pet(self, tasks: List[Task], pet_name: str) -> List[Task]:
+        """Filter tasks by pet name."""
+        return [task for task in tasks if task.pet_name == pet_name]
+
     def detect_conflicts(self, tasks: List[Task]) -> List[Tuple[Task, Task]]:
         """Detect overlapping tasks in the provided task list."""
         conflicts: List[Tuple[Task, Task]] = []
@@ -86,3 +97,26 @@ class Scheduler:
                 conflicts.append((current, next_task))
 
         return conflicts
+
+    def generate_recurring_tasks(self, task: Task, num_days: int) -> List[Task]:
+        """Generate recurring task instances for the next num_days days."""
+        if not task.recurrence:
+            return [task]
+        
+        tasks = []
+        delta = timedelta(days=1) if task.recurrence == "daily" else timedelta(days=7)
+        
+        for i in range(num_days):
+            new_time = task.time + i * delta
+            new_task = Task(
+                name=task.name,
+                duration=task.duration,
+                priority=task.priority,
+                time=new_time,
+                status=task.status,
+                pet_name=task.pet_name,
+                recurrence=task.recurrence
+            )
+            tasks.append(new_task)
+        
+        return tasks
