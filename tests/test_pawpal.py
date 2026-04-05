@@ -36,6 +36,45 @@ def test_scheduler_sort_by_time_with_priority() -> None:
     assert sorted_tasks[2].name == "Low priority"
 
 
+def test_scheduler_sort_two_tasks_same_time_by_priority() -> None:
+    scheduler = Scheduler()
+    time = datetime(2026, 4, 5, 9, 0)
+    low_priority_task = Task(name="Low priority", duration=10, priority=3, time=time)
+    high_priority_task = Task(name="High priority", duration=10, priority=1, time=time)
+
+    sorted_tasks = scheduler.sort_by_time([low_priority_task, high_priority_task])
+
+    assert sorted_tasks[0] is high_priority_task
+    assert sorted_tasks[1] is low_priority_task
+
+
+def test_scheduler_daily_recurrence_after_completion() -> None:
+    scheduler = Scheduler()
+    base_time = datetime(2026, 4, 5, 8, 0)
+    task = Task(name="Daily meds", duration=10, priority=1, time=base_time, recurrence="daily")
+
+    task.mark_complete()
+    recurring_tasks = scheduler.generate_recurring_tasks(task, 2)
+
+    assert task.status == "completed"
+    assert recurring_tasks[0].time == base_time
+    assert recurring_tasks[1].time == base_time + timedelta(days=1)
+    assert recurring_tasks[0].status == "completed"
+    assert recurring_tasks[1].status == "completed"
+
+
+def test_scheduler_detects_conflict_for_same_time_tasks() -> None:
+    scheduler = Scheduler()
+    time = datetime(2026, 4, 5, 8, 0)
+    task1 = Task(name="Task 1", duration=10, priority=1, time=time)
+    task2 = Task(name="Task 2", duration=15, priority=2, time=time)
+
+    conflicts = scheduler.detect_conflicts([task1, task2])
+
+    assert len(conflicts) == 1
+    assert conflicts[0] == (task1, task2)
+
+
 def test_scheduler_filter_by_status() -> None:
     scheduler = Scheduler()
     task1 = Task(name="Task 1", duration=10, priority=1, time=datetime.now(), status="pending")
