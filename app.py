@@ -107,27 +107,41 @@ st.divider()
 st.subheader("Build Schedule")
 st.caption("Generate a daily schedule for your pet(s).")
 
+if "schedule" not in st.session_state:
+    st.session_state.schedule = []
+
+status_filter = st.selectbox("Filter schedule by status", ["all", "pending", "completed"], index=0)
+
 if st.button("Generate schedule"):
     if st.session_state.owner and st.session_state.pet.get_tasks():
         scheduler = Scheduler()
-        schedule = scheduler.generate_schedule(st.session_state.owner)
+        st.session_state.schedule = scheduler.generate_schedule(st.session_state.owner)
+        st.session_state.status_filter = status_filter
 
         st.success(f"✓ Schedule generated for {st.session_state.owner.name}!")
-        st.markdown("### Today's Schedule")
-
-        if schedule:
-            for task in schedule:
-                st.markdown(
-                    f"**{task.time.strftime('%H:%M')}** — {task.name} ({task.duration} min, priority {task.priority}) — *{task.status}*"
-                )
-        else:
-            st.info("No tasks in schedule.")
-
-        # Check for conflicts
-        conflicts = scheduler.detect_conflicts(schedule)
-        if conflicts:
-            st.warning(f"⚠️ {len(conflicts)} conflict(s) detected:")
-            for task1, task2 in conflicts:
-                st.markdown(f"- '{task1.name}' overlaps with '{task2.name}'")
     else:
         st.warning("Add at least one task before generating a schedule.")
+
+if st.session_state.schedule:
+    scheduler = Scheduler()
+    full_schedule = scheduler.sort_by_time(st.session_state.schedule)
+    filtered_schedule = full_schedule
+
+    if status_filter != "all":
+        filtered_schedule = scheduler.filter_by_status(full_schedule, status_filter)
+
+    st.markdown("### Today's Schedule")
+    if filtered_schedule:
+        for task in filtered_schedule:
+            st.markdown(
+                f"**{task.time.strftime('%H:%M')}** — {task.name} ({task.duration} min, priority {task.priority}) — *{task.status}*"
+            )
+    else:
+        st.info("No tasks match the selected status.")
+
+    conflicts = scheduler.detect_conflicts(full_schedule)
+    if conflicts:
+        st.warning(f"⚠️ {len(conflicts)} conflict(s) detected:")
+        for task1, task2 in conflicts:
+            st.markdown(f"- '{task1.name}' overlaps with '{task2.name}'")
+
