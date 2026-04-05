@@ -1,4 +1,8 @@
+from datetime import datetime
+
 import streamlit as st
+
+from pawpal_system import Owner, Pet, Scheduler, Task
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -39,15 +43,29 @@ At minimum, your system should:
 st.divider()
 
 st.subheader("Quick Demo Inputs (UI only)")
+
+# Initialize session state for Owner and Pet
+if "owner" not in st.session_state:
+    st.session_state.owner = None
+if "pet" not in st.session_state:
+    st.session_state.pet = None
+
 owner_name = st.text_input("Owner name", value="Jordan")
 pet_name = st.text_input("Pet name", value="Mochi")
 species = st.selectbox("Species", ["dog", "cat", "other"])
 
+# Create/update Owner and Pet in session state
+if st.session_state.owner is None or st.session_state.owner.name != owner_name:
+    st.session_state.owner = Owner(name=owner_name)
+
+if st.session_state.pet is None or st.session_state.pet.name != pet_name:
+    st.session_state.pet = Pet(name=pet_name, species=species)
+    st.session_state.owner.add_pet(st.session_state.pet)
+else:
+    st.session_state.pet.species = species
+
 st.markdown("### Tasks")
 st.caption("Add a few tasks. In your final version, these should feed into your scheduler.")
-
-if "tasks" not in st.session_state:
-    st.session_state.tasks = []
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -57,32 +75,59 @@ with col2:
 with col3:
     priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
 
-if st.button("Add task"):
-    st.session_state.tasks.append(
-        {"title": task_title, "duration_minutes": int(duration), "priority": priority}
-    )
+priority_map = {"low": 3, "medium": 2, "high": 1}
 
-if st.session_state.tasks:
-    st.write("Current tasks:")
-    st.table(st.session_state.tasks)
+if st.button("Add task"):
+    task = Task(
+        name=task_title,
+        duration=int(duration),
+        priority=priority_map[priority],
+        time=datetime.now(),
+    )
+    st.session_state.pet.add_task(task)
+    st.success(f"✓ Task '{task_title}' added to {st.session_state.pet.name}!")
+
+if st.session_state.pet and st.session_state.pet.get_tasks():
+    st.write(f"Tasks for {st.session_state.pet.name}:")
+    task_data = [
+        {
+            "Title": task.name,
+            "Duration (min)": task.duration,
+            "Priority": task.priority,
+            "Status": task.status,
+        }
+        for task in st.session_state.pet.get_tasks()
+    ]
+    st.table(task_data)
 else:
     st.info("No tasks yet. Add one above.")
 
 st.divider()
 
 st.subheader("Build Schedule")
-st.caption("This button should call your scheduling logic once you implement it.")
+st.caption("Generate a daily schedule for your pet(s).")
 
 if st.button("Generate schedule"):
-    st.warning(
-        "Not implemented yet. Next step: create your scheduling logic (classes/functions) and call it here."
-    )
-    st.markdown(
-        """
-Suggested approach:
-1. Design your UML (draft).
-2. Create class stubs (no logic).
-3. Implement scheduling behavior.
-4. Connect your scheduler here and display results.
-"""
-    )
+    if st.session_state.owner and st.session_state.pet.get_tasks():
+        scheduler = Scheduler()
+        schedule = scheduler.generate_schedule(st.session_state.owner)
+
+        st.success(f"✓ Schedule generated for {st.session_state.owner.name}!")
+        st.markdown("### Today's Schedule")
+
+        if schedule:
+            for task in schedule:
+                st.markdown(
+                    f"**{task.time.strftime('%H:%M')}** — {task.name} ({task.duration} min, priority {task.priority}) — *{task.status}*"
+                )
+        else:
+            st.info("No tasks in schedule.")
+
+        # Check for conflicts
+        conflicts = scheduler.detect_conflicts(schedule)
+        if conflicts:
+            st.warning(f"⚠️ {len(conflicts)} conflict(s) detected:")
+            for task1, task2 in conflicts:
+                st.markdown(f"- '{task1.name}' overlaps with '{task2.name}'")
+    else:
+        st.warning("Add at least one task before generating a schedule.")
