@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import List, Optional
+from datetime import datetime, timedelta
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 
 @dataclass
@@ -9,10 +9,10 @@ class Task:
     duration: int
     priority: int
     time: datetime
-    status: str
+    status: str = "pending"
 
     def mark_complete(self) -> None:
-        pass
+        self.status = "completed"
 
 
 @dataclass
@@ -23,10 +23,10 @@ class Pet:
     task_list: List[Task] = field(default_factory=list)
 
     def add_task(self, task: Task) -> None:
-        pass
+        self.task_list.append(task)
 
     def get_tasks(self) -> List[Task]:
-        pass
+        return self.task_list
 
 
 class Owner:
@@ -36,24 +36,43 @@ class Owner:
         self.availability = availability
 
     def add_pet(self, pet: Pet) -> None:
-        pass
+        self.pets_list.append(pet)
 
     def get_pets(self) -> List[Pet]:
-        pass
+        return self.pets_list
 
     def set_availability(self, availability: str) -> None:
-        pass
+        self.availability = availability
 
 
 class Scheduler:
-    def generate_schedule(self, owner: Owner):
-        pass
+    def generate_schedule(self, owner: Owner) -> List[Task]:
+        tasks: List[Task] = []
+        for pet in owner.get_pets():
+            tasks.extend(pet.get_tasks())
+        return self.sort_by_time(tasks)
 
     def sort_by_time(self, tasks: List[Task]) -> List[Task]:
-        pass
+        return sorted(tasks, key=lambda task: task.time)
 
-    def filter_tasks(self, tasks: List[Task], criteria):
-        pass
+    def filter_tasks(
+        self,
+        tasks: List[Task],
+        criteria: Optional[Union[Dict[str, Any], Callable[[Task], bool]]] = None,
+    ) -> List[Task]:
+        if criteria is None:
+            return tasks
+        if callable(criteria):
+            return [task for task in tasks if criteria(task)]
+        return [task for task in tasks if all(getattr(task, key, None) == value for key, value in criteria.items())]
 
-    def detect_conflicts(self, tasks: List[Task]):
-        pass
+    def detect_conflicts(self, tasks: List[Task]) -> List[Tuple[Task, Task]]:
+        conflicts: List[Tuple[Task, Task]] = []
+        sorted_tasks = self.sort_by_time(tasks)
+
+        for current, next_task in zip(sorted_tasks, sorted_tasks[1:]):
+            current_end = current.time + timedelta(minutes=current.duration)
+            if current_end > next_task.time:
+                conflicts.append((current, next_task))
+
+        return conflicts
